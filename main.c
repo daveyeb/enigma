@@ -1,20 +1,26 @@
 #include "enigma.h"
 
-
-int main(){
-    wheels * cash;
+int main()
+{
+	wheels *cash;
 	plugboard *money;
 
 	cash = malloc(sizeof(wheels));
-    config_wheel_order(cash, "IV II V BETA I II");
-    
-	config_ring_settings(cash, "15 23 26 88 99");
-
 	money = malloc(sizeof(plugboard));
-	config_plug_connections(money, "EJ OY IV AQ KW FX MT PS LU BD");
+	int a = config_wheel_order(cash, "IV II III C_THIN");
+	a = config_start_pos_rotors(cash, "A B N");
+	a = config_plug_connections(money, "EJ OY IV AQ KW FX MT PS LU BD");
+	a = config_reflector_wiring(cash, "BETA", "IU AS DV GL FT OX EZ CH MR KN BQ PW");
 
-	printf("%s\n", money->alpha);
+	config_ring_settings(cash, "AB");
 
+	printf("\na = %d\n", a);
 
-    return 0;
+	// encrypt(cash, money, "FRUGAL")
+
+	free(cash);
+
+	// printf("%s\n", money->alpha);
+
+	return 0;
 }
