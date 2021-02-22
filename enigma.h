@@ -30,7 +30,7 @@ typedef struct wheels
 	rotor *_rotors;
 	size_t n_rotors;
 	int is_config;
-	int ring[4];
+	int *ring;
 } wheels;
 
 typedef struct plugboard
@@ -41,10 +41,10 @@ typedef struct plugboard
 
 static inline int config_wheel_order(wheels *_wheels, const char *w_order);
 static inline int config_ring_settings(wheels *_wheels, const char *r_settings);
-// static inline int config_reflector_wiring( wheels * _wheels, char * r_wiring);
-static inline int config_start_pos_rotors(wheels *_wheels, char *w_groups);
+static inline int config_reflector_wiring(wheels *_wheels, const char *reflector, const char *r_wiring);
+static inline int config_start_pos_rotors(wheels *_wheels, const char *indicator);
 static inline int config_plug_connections(plugboard *_plugboard, const char *p_connections);
-static inline char *encrypt(wheels *_wheels, plugboard *_plugboard, char *plaintext);
+static inline char *encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext);
 
 static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 {
@@ -70,12 +70,17 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 	{
 		if (index > 6)
 			return 0;
+
 		pch = strtok(NULL, " ");
 		w_tokens[index++] = pch;
 	}
 
-	_wheels->_rotors = malloc(6 * sizeof(rotor));
+	if (index < 4)
+		return 0;
+
+	_wheels->_rotors = malloc(--index * sizeof(rotor));
 	_wheels->is_config = 0;
+	_wheels->n_rotors = index;
 
 	FILE *f = fopen("./ROTORS", "r");
 
@@ -84,6 +89,7 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 
 	while (fgets(buf, 4096, f) != NULL)
 	{
+
 		if (strlen(buf) > 0 && buf[strlen(buf) - 1] == '\n')
 			buf[strlen(buf) - 1] = '\0';
 
@@ -92,9 +98,11 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 			model_or_wire = 0;
 			continue;
 		}
+
 		if (model_or_wire == 0)
 		{
-			for (index = 0; index < 6; index++)
+
+			for (index = 0; index < _wheels->n_rotors; index++)
 			{
 				if (strcmp(w_tokens[index], buf) == 0)
 				{
@@ -105,9 +113,10 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 		}
 		else
 		{
+
 			char *ttok = w_tokens[index];
 
-			for (; index < 6; index++)
+			for (; index < _wheels->n_rotors; index++)
 			{
 				if (strcmp(w_tokens[index], ttok) != 0)
 					continue;
@@ -119,7 +128,7 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 				{
 
 					reflector_cnt++;
-					if (reflector_cnt == 2)
+					if (reflector_cnt == 3)
 						return 0;
 
 					r.is_reflector = 1;
@@ -152,42 +161,55 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 
 			model_or_wire = 0;
 		}
-
-		_wheels->is_config = 1;
 	}
 
+	if (reflector_cnt == 0)
+		return 0;
+
+	_wheels->is_config = 1;
+
 	free(w_order_cpy);
+
 	return 1;
 }
 
-static inline int config_ring_settings(wheels *_wheels, const char *r_settings){
-	
-	char * pch;
+static inline int config_start_pos_rotors(wheels *_wheels, const char *indicator)
+{
+
+	char *pch;
+	char *indicator_cpy;
 	int index;
-	char *r_settings_cpy;
+	int max_rings;
 
-	r_settings_cpy = malloc(strlen(r_settings) + 1);
-	strcpy(r_settings_cpy, r_settings);
+	max_rings = _wheels->n_rotors > 5 ? 3 : 4;
+	_wheels->ring = malloc(sizeof(int) * max_rings);
 
-	pch = strtok(r_settings_cpy, " ");
-	
+	indicator_cpy = malloc(strlen(indicator) + 1);
+	strcpy(indicator_cpy, indicator);
+
+	pch = strtok(indicator_cpy, " ");
+
 	index = 0;
 	_wheels->ring[index++] = atoi(pch);
-	
-	while(pch != NULL){
-		if(strlen(pch) > 2 || index > 4) return 0;
-		_wheels->ring[index++] = atoi(pch);
+
+	while (pch != NULL)
+	{
+		if (strlen(pch) > 1 || index == max_rings)
+			return 0;
+
+		_wheels->ring[index++] = pch[0];
 		pch = strtok(NULL, " ");
 	}
 
+	free(indicator_cpy);
 
-	free(r_settings_cpy);
 	return 1;
 }
 
-static inline int config_plug_connections(plugboard *_plugboard, const char *p_connections) {
-	char * p_connections_cpy;
-	char * pch;
+static inline int config_plug_connections(plugboard *_plugboard, const char *p_connections)
+{
+	char *p_connections_cpy;
+	char *pch;
 	int index;
 
 	p_connections_cpy = malloc(strlen(p_connections) + 1);
@@ -197,15 +219,18 @@ static inline int config_plug_connections(plugboard *_plugboard, const char *p_c
 	_plugboard->stecker_count = 0;
 
 	index = 64;
-	while(++index < 91){
+	while (++index < 91)
+	{
 		_plugboard->alpha[(index % 65)] = index;
 	}
 
 	pch = strtok(p_connections_cpy, " ");
 
 	index = 0;
-	while(pch != NULL){
-		if(strlen(pch) > 2 || _plugboard->stecker_count++ > 13) return 0;
+	while (pch != NULL)
+	{
+		if (strlen(pch) > 2 || _plugboard->stecker_count++ > 13)
+			return 0;
 
 		_plugboard->alpha[(pch[0] % 65)] = pch[1];
 		_plugboard->alpha[(pch[1] % 65)] = pch[0];
@@ -213,9 +238,80 @@ static inline int config_plug_connections(plugboard *_plugboard, const char *p_c
 		pch = strtok(NULL, " ");
 	}
 
+	return 1;
+}
+
+static inline int config_reflector_wiring(wheels *_wheels, const char *reflector, const char *r_wiring)
+{
+	char *pch;
+	char *pch2[2];
+	char *r_wiring_cpy;
+	char *rfl_alpha_cpy;
+
+	int n_rotors;
+	int index;
+	int r_index;
+	int f_index;
+
+	n_rotors = _wheels->n_rotors;
+
+	for (index = 0; index < n_rotors; index++)
+	{
+		if (_wheels->_rotors[index].is_reflector && strcmp(_wheels->_rotors[index].model_name, reflector) == 0)
+			break;
+		else
+			return 0;
+	}
+
+	r_wiring_cpy = malloc(strlen(r_wiring) + 1);
+	strcpy(r_wiring_cpy, r_wiring);
+
+	r_index = index;
+	pch = strtok(r_wiring_cpy, " ");
+
+	rfl_alpha_cpy = malloc(strlen(_wheels->_rotors[r_index].alpha) + 1);
+	strcpy(rfl_alpha_cpy, _wheels->_rotors[r_index].alpha);
+
+	index = 0;
+	while (pch != NULL)
+	{
+		if (strlen(pch) > 2 || index > 13)
+			return 0;
+
+		pch2[0] = strchr(rfl_alpha_cpy, pch[0]);
+		pch2[1] = strchr(rfl_alpha_cpy, pch[1]);
+
+		rfl_alpha_cpy[(pch2[0] - rfl_alpha_cpy)] = pch[1];
+		rfl_alpha_cpy[(pch2[1] - rfl_alpha_cpy)] = pch[0];
+
+		index++;
+		pch = strtok(NULL, " ");
+	}
+
+	strcpy(_wheels->_rotors[r_index].alpha, rfl_alpha_cpy);
+
+	free(rfl_alpha_cpy);
 
 	return 1;
 }
 
+static inline int config_ring_settings(wheels *_wheels, const char *r_settings)
+{
+	int index;
+	int n = _wheels->n_rotors;
+
+	for (index = 0; index < n; index++)
+	{
+		printf("%s %s\n", _wheels->_rotors[index].model_name, _wheels->_rotors[index].alpha);
+	}
+
+	return 0;
+}
+
+// static inline char *encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext) {
+// 	char * plaintext_cpy;
+// 	int index;
+
+// }
 
 #endif // ENIGMA
