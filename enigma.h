@@ -190,8 +190,6 @@ static inline int config_start_pos_rotors(wheels *_wheels, const char *indicator
 	pch = strtok(indicator_cpy, " ");
 
 	index = 0;
-	_wheels->ring[index++] = atoi(pch);
-
 	while (pch != NULL)
 	{
 		if (strlen(pch) > 1 || index == max_rings)
@@ -298,14 +296,54 @@ static inline int config_reflector_wiring(wheels *_wheels, const char *reflector
 static inline int config_ring_settings(wheels *_wheels, const char *r_settings)
 {
 	int index;
-	int n = _wheels->n_rotors;
+	int dot_pos;
+	int n_rotors = _wheels->n_rotors;
+	char *r_settings_cpy;
+	char *r_alpha_cpy;
+	char *pch;
 
-	for (index = 0; index < n; index++)
-	{
-		printf("%s %s\n", _wheels->_rotors[index].model_name, _wheels->_rotors[index].alpha);
+	r_settings_cpy = malloc(strlen(r_settings) + 1);
+	strcpy(r_settings_cpy, r_settings);
+
+	r_alpha_cpy = malloc(strlen(_wheels->_rotors[index].alpha) + 1);
+	strcpy(r_alpha_cpy, _wheels->_rotors[index].alpha);
+
+	pch = strtok(r_settings_cpy, " ");
+	while(pch != NULL){
+
+		dot_pos = strchr(r_alpha_cpy, pch[0]);
+
+		pch = strtok(NULL, " ");
 	}
 
-	return 0;
+
+
+	printf("pch : %s\n", pch);
+
+
+
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	// for (index = 0; index < n; index++)
+	// {
+	// 	printf("%s %s\n", _wheels->_rotors[index].model_name, _wheels->_rotors[index].alpha);
+	// 	printf("%s %c\n", _wheels->_rotors[index].model_name, _wheels->ring[index]);
+	// }
+
+
+
+
+
+	return 1;
 }
 
 // static inline char *encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext) {
