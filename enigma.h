@@ -10,12 +10,7 @@
 #include <ctype.h>
 
 #define rotor_no(s) #s
-
-typedef struct wiring
-{
-	int no;
-	char *value;
-} wiring;
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 typedef struct rotor
 {
@@ -31,6 +26,7 @@ typedef struct wheels
 	size_t n_rotors;
 	int is_config;
 	int *ring;
+	int is_step;
 } wheels;
 
 typedef struct plugboard
@@ -44,7 +40,8 @@ static inline int config_ring_settings(wheels *_wheels, const char *r_settings);
 static inline int config_reflector_wiring(wheels *_wheels, const char *reflector, const char *r_wiring);
 static inline int config_start_pos_rotors(wheels *_wheels, const char *indicator);
 static inline int config_plug_connections(plugboard *_plugboard, const char *p_connections);
-static inline char *encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext);
+static inline int _step(wheels * _wheels);
+static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext);
 
 static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 {
@@ -62,6 +59,7 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 
 	w_order_cpy = malloc(strlen(w_order) + 1);
 	strcpy(w_order_cpy, w_order);
+	w_order_cpy[strlen(w_order)] = '\0';
 
 	index = 0;
 	pch = strtok(w_order_cpy, " ");
@@ -135,9 +133,11 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 
 					r.alpha = malloc(strlen(buf + 1) + 1);
 					strcpy(r.alpha, buf + 1);
+					r.alpha[strlen(buf + 1)] = '\0';
 
 					r.model_name = malloc(strlen(w_tokens[index]) + 1);
 					strcpy(r.model_name, w_tokens[index]);
+					r.model_name[strlen(w_tokens[index])] = '\0';
 
 					r.notch = NULL;
 				}
@@ -146,14 +146,17 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 
 					r.is_reflector = 0;
 
-					r.alpha = malloc(strlen(buf + 1) + 1);
+					r.alpha = malloc(26);
 					strncpy(r.alpha, buf + 1, 26);
+					r.alpha[26] = '\0';
 
 					r.model_name = malloc(strlen(w_tokens[index]) + 1);
 					strcpy(r.model_name, w_tokens[index]);
+					r.model_name[strlen(w_tokens[index])] = '\0';
 
 					r.notch = malloc(3);
 					strcpy(r.notch, buf + 28);
+					r.notch[30] = '\0';
 				}
 
 				_wheels->_rotors[index] = r;
@@ -167,6 +170,7 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 		return 0;
 
 	_wheels->is_config = 1;
+	_wheels->is_step = 0;
 
 	free(w_order_cpy);
 
@@ -186,6 +190,7 @@ static inline int config_start_pos_rotors(wheels *_wheels, const char *indicator
 
 	indicator_cpy = malloc(strlen(indicator) + 1);
 	strcpy(indicator_cpy, indicator);
+	indicator_cpy[strlen(indicator)] = '\0';
 
 	pch = strtok(indicator_cpy, " ");
 
@@ -212,6 +217,7 @@ static inline int config_plug_connections(plugboard *_plugboard, const char *p_c
 
 	p_connections_cpy = malloc(strlen(p_connections) + 1);
 	strcpy(p_connections_cpy, p_connections);
+	p_connections_cpy[strlen(p_connections)] = '\0';
 
 	_plugboard->alpha = malloc(27);
 	_plugboard->stecker_count = 0;
@@ -221,6 +227,7 @@ static inline int config_plug_connections(plugboard *_plugboard, const char *p_c
 	{
 		_plugboard->alpha[(index % 65)] = index;
 	}
+	_plugboard->alpha[26] = '\0';
 
 	pch = strtok(p_connections_cpy, " ");
 
@@ -235,6 +242,8 @@ static inline int config_plug_connections(plugboard *_plugboard, const char *p_c
 
 		pch = strtok(NULL, " ");
 	}
+
+	free(p_connections_cpy);
 
 	return 1;
 }
@@ -257,18 +266,21 @@ static inline int config_reflector_wiring(wheels *_wheels, const char *reflector
 	{
 		if (_wheels->_rotors[index].is_reflector && strcmp(_wheels->_rotors[index].model_name, reflector) == 0)
 			break;
-		else
-			return 0;
 	}
+
+	if (index == n_rotors)
+		return 0;
 
 	r_wiring_cpy = malloc(strlen(r_wiring) + 1);
 	strcpy(r_wiring_cpy, r_wiring);
+	r_wiring_cpy[strlen(r_wiring)] = '\0';
 
 	r_index = index;
 	pch = strtok(r_wiring_cpy, " ");
 
 	rfl_alpha_cpy = malloc(strlen(_wheels->_rotors[r_index].alpha) + 1);
 	strcpy(rfl_alpha_cpy, _wheels->_rotors[r_index].alpha);
+	rfl_alpha_cpy[strlen(r_wiring)] = '\0';
 
 	index = 0;
 	while (pch != NULL)
@@ -287,6 +299,7 @@ static inline int config_reflector_wiring(wheels *_wheels, const char *reflector
 	}
 
 	strcpy(_wheels->_rotors[r_index].alpha, rfl_alpha_cpy);
+	/// check here
 
 	free(rfl_alpha_cpy);
 
@@ -295,61 +308,54 @@ static inline int config_reflector_wiring(wheels *_wheels, const char *reflector
 
 static inline int config_ring_settings(wheels *_wheels, const char *r_settings)
 {
-	int index;
-	int dot_pos;
-	int n_rotors = _wheels->n_rotors;
-	char *r_settings_cpy;
-	char *r_alpha_cpy;
-	char *pch;
-
-	r_settings_cpy = malloc(strlen(r_settings) + 1);
-	strcpy(r_settings_cpy, r_settings);
-
-	r_alpha_cpy = malloc(strlen(_wheels->_rotors[index].alpha) + 1);
-	strcpy(r_alpha_cpy, _wheels->_rotors[index].alpha);
-
-	pch = strtok(r_settings_cpy, " ");
-	while(pch != NULL){
-
-		dot_pos = strchr(r_alpha_cpy, pch[0]);
-
-		pch = strtok(NULL, " ");
-	}
-
-
-
-	printf("pch : %s\n", pch);
-
-
-
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	// for (index = 0; index < n; index++)
-	// {
-	// 	printf("%s %s\n", _wheels->_rotors[index].model_name, _wheels->_rotors[index].alpha);
-	// 	printf("%s %c\n", _wheels->_rotors[index].model_name, _wheels->ring[index]);
-	// }
-
-
-
-
-
 	return 1;
 }
 
-// static inline char *encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext) {
-// 	char * plaintext_cpy;
-// 	int index;
+//arrange rotors
 
-// }
+static inline int _step(wheels * _wheels) {
+	rotor * rs; 
+	int n_rotors;
+	int index;
+	int * ring;
+
+	if(!_wheels->is_config) return 0;
+
+	rs = _wheels->_rotors;
+	n_rotors = _wheels->n_rotors;
+
+	ring = _wheels->ring;
+
+	index = 0; 
+	while(index < n_rotors-1){
+		printf(" %s \n", rs[index++].notch);
+	}
+
+	ring[2] = ++ring[2] % 26;
+
+	return 1; 
+}
+
+static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext) {
+	char * plaintext_cpy;
+	
+	int n_rotors;
+	int path;
+	int mid_path;
+	
+	rotor * rs;
+	plugboard * p;
+
+	// plaintext_cpy = malloc(strlen(plaintext) + 1);
+	// strcpy(plaintext_cpy, plaintext);
+	// plaintext_cpy[strlen(plaintext)] = '\0';
+
+	_step(_wheels);	
+	// printf("alpha p : %s\n", _plugboard->alpha);
+
+	printf("current ring : %d %d %d", _wheels->ring[0], _wheels->ring[1], _wheels->ring[2]);
+
+	return 1;
+}
 
 #endif // ENIGMA
