@@ -41,7 +41,16 @@ static inline int config_reflector_wiring(wheels *_wheels, const char *reflector
 static inline int config_start_pos_rotors(wheels *_wheels, const char *indicator);
 static inline int config_plug_connections(plugboard *_plugboard, const char *p_connections);
 static inline int _step(wheels * _wheels);
+static inline int _increment_ring(int * c);
+static inline int _walk_index(int * index, int * ret, int n_rotors);
 static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext);
+
+static inline int _increment_ring(int * c){
+	if(*c < 65 || *c > 90) return 0;
+	if(++*c > 90) *c -= 26;
+
+	return 1;
+}
 
 static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 {
@@ -323,37 +332,82 @@ static inline int _step(wheels * _wheels) {
 
 	rs = _wheels->_rotors;
 	n_rotors = _wheels->n_rotors;
-
 	ring = _wheels->ring;
 
-	index = 0; 
-	while(index < n_rotors-1){
-		printf(" %s \n", rs[index++].notch);
+	if(strchr(rs[1].notch, (char)ring[1]) ==  NULL){
+		_wheels->is_step = 0;
 	}
 
-	ring[2] = ++ring[2] % 26;
+	if(strchr(rs[1].notch, (char)ring[1]) && !_wheels->is_step){
+		_increment_ring(&ring[2]);
+		_increment_ring(&ring[1]);
+		_increment_ring(&ring[0]);
+
+		_wheels->is_step = 1;
+		return 1;
+	}
+
+	if(strchr(rs[2].notch, (char)ring[2])){
+		_increment_ring(&ring[2]);
+		_increment_ring(&ring[1]);
+		return 1;
+	}
+
+	_increment_ring(&ring[2]);
 
 	return 1; 
 }
 
+
+static inline int _walk_index(int * index, int * ret, int n_rotors){
+	if( *index < 0 || *index > n_rotors) return 0;
+
+	if(*index == n_rotors - 1) *ret = 1;
+
+	if(*ret) (*index)--;
+	else (*index)++;
+
+	return 1;
+}
+
 static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext) {
-	char * plaintext_cpy;
 	
+	int index;
 	int n_rotors;
+	int return_f; // return flag
 	int path;
 	int mid_path;
+	int * ring;
+	char * plug_al;
+	char * pch;
+	char * plaintext_cpy;
 	
 	rotor * rs;
 	plugboard * p;
 
-	// plaintext_cpy = malloc(strlen(plaintext) + 1);
-	// strcpy(plaintext_cpy, plaintext);
-	// plaintext_cpy[strlen(plaintext)] = '\0';
+	rs = _wheels->_rotors;
+	p = _plugboard;
+	n_rotors = _wheels->n_rotors;
 
-	_step(_wheels);	
-	// printf("alpha p : %s\n", _plugboard->alpha);
+	plaintext_cpy = malloc(strlen(plaintext) + 1);
+	strcpy(plaintext_cpy, plaintext);
+	plaintext_cpy[strlen(plaintext_cpy)] = '\0';
 
-	printf("current ring : %d %d %d", _wheels->ring[0], _wheels->ring[1], _wheels->ring[2]);
+	ring = _wheels->ring;
+	plug_al = _plugboard->alpha;
+
+	index = 0;
+	int a = 0;
+	return_f = 0;
+	while(a < 6){
+		// _step(_wheels);
+		printf("index : %d \n", index);
+		_walk_index( &index, &return_f, n_rotors);
+		
+		a++;
+	}
+
+	// _walk_index( &index, &return_f, n_rotors);
 
 	return 1;
 }
