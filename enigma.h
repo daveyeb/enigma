@@ -389,7 +389,7 @@ static inline int _walk(indices * _indices, int n_rotors, int index){
 
 static inline int _scramble(int * c, indices * _indices, int * ring){
 
-	int invert_flg = _indices->is_inverted ^ _indices->is_contact;
+	int invert_flg = !(_indices->is_inverted && _indices->is_contact);
 
 
 	switch (_indices->is_contact)
@@ -401,8 +401,11 @@ static inline int _scramble(int * c, indices * _indices, int * ring){
 			*c = *c  + (ring[2] - ring[3]);
 		break;
 	case 0:
-		if()
-
+		if(invert_flg)
+			*c = *c - ring[3];
+		else 
+			*c = *c + ring[];
+			
 		break;
 	
 	default:
