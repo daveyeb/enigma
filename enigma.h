@@ -35,6 +35,15 @@ typedef struct plugboard
 	int stecker_count;
 } plugboard;
 
+typedef struct indices 
+{
+	int r_index; 
+	int is_inverted;
+	int is_contact;
+} indices;
+
+
+
 static inline int config_wheel_order(wheels *_wheels, const char *w_order);
 static inline int config_ring_settings(wheels *_wheels, const char *r_settings);
 static inline int config_reflector_wiring(wheels *_wheels, const char *reflector, const char *r_wiring);
@@ -42,7 +51,8 @@ static inline int config_start_pos_rotors(wheels *_wheels, const char *indicator
 static inline int config_plug_connections(plugboard *_plugboard, const char *p_connections);
 static inline int _step(wheels * _wheels);
 static inline int _increment_ring(int * c);
-static inline int _walk_index(int * index, int * ret, int n_rotors);
+static inline int _walk(indices * _indices, int n_rotors, int index);
+static inline int _scramble(int * c, int * contact, int int * ring);
 static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext);
 
 static inline int _increment_ring(int * c){
@@ -334,11 +344,11 @@ static inline int _step(wheels * _wheels) {
 	n_rotors = _wheels->n_rotors;
 	ring = _wheels->ring;
 
-	if(strchr(rs[1].notch, (char)ring[1]) ==  NULL){
+	if(strchr(rs[2].notch, (char)ring[1]) ==  NULL){
 		_wheels->is_step = 0;
 	}
 
-	if(strchr(rs[1].notch, (char)ring[1]) && !_wheels->is_step){
+	if(strchr(rs[2].notch, (char)ring[1]) && !_wheels->is_step){
 		_increment_ring(&ring[2]);
 		_increment_ring(&ring[1]);
 		_increment_ring(&ring[0]);
@@ -347,7 +357,7 @@ static inline int _step(wheels * _wheels) {
 		return 1;
 	}
 
-	if(strchr(rs[2].notch, (char)ring[2])){
+	if(strchr(rs[3].notch, (char)ring[2])){
 		_increment_ring(&ring[2]);
 		_increment_ring(&ring[1]);
 		return 1;
@@ -359,24 +369,60 @@ static inline int _step(wheels * _wheels) {
 }
 
 
-static inline int _walk_index(int * index, int * ret, int n_rotors){
-	if( *index < 0 || *index > n_rotors) return 0;
+static inline int _walk(indices * _indices, int n_rotors, int index){
 
-	if(*index == n_rotors - 1) *ret = 1;
+	if( _indices->r_index < 0 || _indices->r_index > n_rotors) 
+		return 0;
 
-	if(*ret) (*index)--;
-	else (*index)++;
+	if(_indices->r_index == n_rotors - 1) 
+		_indices->is_inverted = 1;
+
+	if(index % 2 == 0) 
+		_indices->is_contact = ++_indices->is_contact % 2;
+
+	if(_indices->is_inverted) 
+		_indices->r_index--;
+	else _indices->r_index++;
+
+	return 1;
+}
+
+static inline int _scramble(int * c, indices * _indices, int * ring){
+
+	int invert_flg = _indices->is_inverted ^ _indices->is_contact;
+
+
+	switch (_indices->is_contact)
+	{
+	case 1:
+		if(_indices->is_inverted)
+			*c = *c  + (ring[1] - ring[2]);
+		else 
+			*c = *c  + (ring[2] - ring[3]);
+		break;
+	case 0:
+		if()
+
+		break;
+	
+	default:
+		break;
+	}
+
+	if(*c < 65) 
+		*c += 91;
+	else if(*c > 90)
+		*c %= 91;
 
 	return 1;
 }
 
 static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext) {
 	
-	int index;
 	int n_rotors;
-	int return_f; // return flag
-	int path;
-	int mid_path;
+	// int path;
+	// int mid_path;
+	int route;
 	int * ring;
 	char * plug_al;
 	char * pch;
@@ -384,6 +430,11 @@ static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *pl
 	
 	rotor * rs;
 	plugboard * p;
+	indices i;
+
+	i.is_contact = 0;
+	i.is_inverted = 0;
+	i.r_index = 0;
 
 	rs = _wheels->_rotors;
 	p = _plugboard;
@@ -396,18 +447,38 @@ static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *pl
 	ring = _wheels->ring;
 	plug_al = _plugboard->alpha;
 
-	index = 0;
-	int a = 0;
-	return_f = 0;
-	while(a < 6){
-		// _step(_wheels);
-		printf("index : %d \n", index);
-		_walk_index( &index, &return_f, n_rotors);
+	int index = 0; 
+
+	// while( index < n_rotors){
+	// 	printf("%d r_name %s\n", 3 - index , _wheels->_rotors[index].model_name);
+	// 	index++;
+	// }
+
+	int max_str = strlen(plaintext_cpy);
+
+	while( index < max_str){
+		plaintext_cpy[index] = plug_al[(plaintext_cpy[index] % 65)];
 		
-		a++;
+		printf("%c\n", plaintext_cpy[index++]);
+
+
+		route = 0;
+		while(route < 7){
+			_step(_wheels);	
+			// printf("r_index : %d  invert : %d contact : %d\n", i.r_index , i.is_inverted, i.is_contact);	
+			_walk(&i, n_rotors, route);
+
+			route++;
+		}
+
 	}
 
-	// _walk_index( &index, &return_f, n_rotors);
+	while( index < n_rotors){
+		printf("%d r_name %s\n", 3 - index , _wheels->_rotors[index].model_name);
+		index++;
+	}
+
+	
 
 	return 1;
 }
