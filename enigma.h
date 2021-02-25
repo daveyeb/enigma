@@ -37,6 +37,7 @@ typedef struct plugboard
 
 typedef struct indices 
 {
+	int index;
 	int r_index; 
 	int is_inverted;
 	int is_contact;
@@ -52,7 +53,7 @@ static inline int config_plug_connections(plugboard *_plugboard, const char *p_c
 static inline int _step(wheels * _wheels);
 static inline int _increment_ring(int * c);
 static inline int _walk(indices * _indices, int n_rotors, int index);
-static inline int _scramble(int * c, int * contact, int int * ring);
+static inline int _scramble(int * c, indices * _indices, int * ring);
 static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext);
 
 static inline int _increment_ring(int * c){
@@ -390,21 +391,32 @@ static inline int _walk(indices * _indices, int n_rotors, int index){
 static inline int _scramble(int * c, indices * _indices, int * ring){
 
 	int invert_flg = !(_indices->is_inverted && _indices->is_contact);
+	invert_flg =  invert_flg && (_indices->index % 2 == 1);
+
+	// invert_flg = invert_flg && (_indices->index > 3);
+	// if(invert_flg)
+	// printf("r_index : %d inverted : %d contact: %d\n", _indices->r_index, _indices->is_inverted, _indices->is_contact);
 
 
 	switch (_indices->is_contact)
 	{
 	case 1:
+		printf("r_index : %d inverted : %d contact: %d index : %d\n", _indices->r_index, _indices->is_inverted, _indices->is_contact, _indices->index);
 		if(_indices->is_inverted)
 			*c = *c  + (ring[1] - ring[2]);
 		else 
 			*c = *c  + (ring[2] - ring[3]);
 		break;
 	case 0:
-		if(invert_flg)
-			*c = *c - ring[3];
-		else 
-			*c = *c + ring[];
+		printf("-r_index : %d inverted : %d contact: %d index : %d", _indices->r_index, _indices->is_inverted, _indices->is_contact, _indices->index);
+		int a = (_indices->r_index <= 0) ? 3 : 0;
+		if(invert_flg){
+			printf("--%d \n", a);
+			*c = *c - ring[a];
+		}else {
+			printf(" %d \n", a);
+			*c = *c + ring[a];
+		}
 			
 		break;
 	
@@ -438,6 +450,7 @@ static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *pl
 	i.is_contact = 0;
 	i.is_inverted = 0;
 	i.r_index = 0;
+	i.index = 0;
 
 	rs = _wheels->_rotors;
 	p = _plugboard;
@@ -452,26 +465,20 @@ static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *pl
 
 	int index = 0; 
 
-	// while( index < n_rotors){
-	// 	printf("%d r_name %s\n", 3 - index , _wheels->_rotors[index].model_name);
-	// 	index++;
-	// }
-
 	int max_str = strlen(plaintext_cpy);
 
 	while( index < max_str){
 		plaintext_cpy[index] = plug_al[(plaintext_cpy[index] % 65)];
 		
 		printf("%c\n", plaintext_cpy[index++]);
-
-
-		route = 0;
-		while(route < 7){
+		in 
+		i.index = 0;
+		while(i.index <= 7){
 			_step(_wheels);	
-			// printf("r_index : %d  invert : %d contact : %d\n", i.r_index , i.is_inverted, i.is_contact);	
-			_walk(&i, n_rotors, route);
+			_scramble((int), &i, ring);
+			_walk(&i, n_rotors, i.index);
 
-			route++;
+			i.index++;
 		}
 
 	}
