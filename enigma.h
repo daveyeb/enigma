@@ -35,31 +35,32 @@ typedef struct plugboard
 	int stecker_count;
 } plugboard;
 
-typedef struct indices 
+typedef struct indices
 {
 	int index;
-	int r_index; 
+	int r_index;
 	int is_inverted;
 	int is_contact;
 } indices;
-
-
 
 static inline int config_wheel_order(wheels *_wheels, const char *w_order);
 static inline int config_ring_settings(wheels *_wheels, const char *r_settings);
 static inline int config_reflector_wiring(wheels *_wheels, const char *reflector, const char *r_wiring);
 static inline int config_start_pos_rotors(wheels *_wheels, const char *indicator);
 static inline int config_plug_connections(plugboard *_plugboard, const char *p_connections);
-static inline int _step(wheels * _wheels);
-static inline int _increment_ring(int * c);
+static inline int _step(wheels *_wheels);
+static inline int _increment_ring(int *c);
 static inline int _index(int c);
-static inline int _walk(indices * _indices, int n_rotors, int index);
-static inline int _scramble(int * c, indices * _indices, int * ring);
+static inline int _walk(indices *_indices, int n_rotors, int index);
+static inline int _scramble(int *c, indices *_indices, int *ring, rotor *rotors);
 static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext);
 
-static inline int _increment_ring(int * c){
-	if(*c < 65 || *c > 90) return 0;
-	if(++*c > 90) *c -= 26;
+static inline int _increment_ring(int *c)
+{
+	if (*c < 65 || *c > 90)
+		return 0;
+	if (++*c > 90)
+		*c -= 26;
 
 	return 1;
 }
@@ -334,23 +335,27 @@ static inline int config_ring_settings(wheels *_wheels, const char *r_settings)
 
 //arrange rotors
 
-static inline int _step(wheels * _wheels) {
-	rotor * rs; 
+static inline int _step(wheels *_wheels)
+{
+	rotor *rs;
 	int n_rotors;
 	int index;
-	int * ring;
+	int *ring;
 
-	if(!_wheels->is_config) return 0;
+	if (!_wheels->is_config)
+		return 0;
 
 	rs = _wheels->_rotors;
 	n_rotors = _wheels->n_rotors;
 	ring = _wheels->ring;
 
-	if(strchr(rs[2].notch, (char)ring[1]) ==  NULL){
+	if (strchr(rs[2].notch, (char)ring[1]) == NULL)
+	{
 		_wheels->is_step = 0;
 	}
 
-	if(strchr(rs[2].notch, (char)ring[1]) && !_wheels->is_step){
+	if (strchr(rs[2].notch, (char)ring[1]) && !_wheels->is_step)
+	{
 		_increment_ring(&ring[2]);
 		_increment_ring(&ring[1]);
 		_increment_ring(&ring[0]);
@@ -359,7 +364,8 @@ static inline int _step(wheels * _wheels) {
 		return 1;
 	}
 
-	if(strchr(rs[3].notch, (char)ring[2])){
+	if (strchr(rs[3].notch, (char)ring[2]))
+	{
 		_increment_ring(&ring[2]);
 		_increment_ring(&ring[1]);
 		return 1;
@@ -367,98 +373,123 @@ static inline int _step(wheels * _wheels) {
 
 	_increment_ring(&ring[2]);
 
-	return 1; 
+	return 1;
 }
 
+static inline int _walk(indices *_indices, int n_rotors, int index)
+{
 
-static inline int _walk(indices * _indices, int n_rotors, int index){
-
-	if( _indices->r_index < 0 || _indices->r_index > n_rotors) 
+	if (_indices->r_index < 0 || _indices->r_index > n_rotors)
 		return 0;
 
-	if(_indices->r_index == n_rotors - 1) 
+	if (_indices->r_index == n_rotors - 1)
 		_indices->is_inverted = 1;
 
-	if(index % 2 == 0) 
+	if (index % 2 == 0)
 		_indices->is_contact = ++_indices->is_contact % 2;
 
-	if(_indices->is_inverted) 
+	if (_indices->is_inverted)
 		_indices->r_index--;
-	else _indices->r_index++;
+	else
+		_indices->r_index++;
 
 	return 1;
 }
 
-static inline int _index(int c){
+static inline int _index(int c)
+{
 	return c - 65;
 }
 
-static inline int _scramble(int * c, indices * _indices, int * ring){
+static inline int _scramble(int *c, indices *_indices, int *ring, rotor *rotors)
+{
 
 	int invert_flg = !(_indices->is_inverted && _indices->is_contact);
-	invert_flg =  invert_flg && (_indices->index % 2 == 1);
+	invert_flg = invert_flg && (_indices->index % 2 == 1);
 	int a;
-	// invert_flg = invert_flg && (_indices->index > 3);
-	// if(invert_flg)
-	// printf("r_index : %d inverted : %d contact: %d\n", _indices->r_index, _indices->is_inverted, _indices->is_contact);
 
-	// printf("%d -- ", _indices->r_index);
+	if (_indices->r_index < 0)
+	{
+		*c = _index(*c);
+		return 1;
+	}
+
 	switch (_indices->is_contact)
 	{
 	case 1:
-		// printf("r_index : %d inverted : %d contact: %d index : %d\n", _indices->r_index, _indices->is_inverted, _indices->is_contact, _indices->index);
-		if(_indices->r_index % 2 == 0){
-			printf("2\n");
-			*c = _index(*c)   + (_index(ring[0]) - _index(ring[1]));
-		}else{ 
-			printf("1\n");
-			*c = _index(*c)   + (_index(ring[1])  - _index(ring[2]));
+		a = !_indices->is_inverted ? _indices->r_index % 2 == 0 : _indices->r_index % 2 == 1;
+		if (a)
+		{
+			printf("%d index %d +  %d - %d = %d \n", *c, _index(*c), _index(ring[1]), _index(ring[2]), _index(*c) + (_index(ring[1]) - _index(ring[2])));
+			*c = _index(*c) + (_index(ring[0]) - _index(ring[1]));
+		}
+		else
+		{
+			printf("%d index %d +  %d - %d = %d \n", *c, _index(*c), _index(ring[1]), _index(ring[2]), _index(*c) + (_index(ring[1]) - _index(ring[2])));
+			*c = _index(*c) + (_index(ring[1]) - _index(ring[2]));
+			printf("%c index \n", *c + 65);
 		}
 		break;
 	case 0:
-		// printf("-r_index : %d inverted : %d contact: %d index : %d", _indices->r_index, _indices->is_inverted, _indices->is_contact, _indices->index);
 		a = (_indices->r_index <= 0) ? 2 : 0;
-		if(invert_flg){
-			printf("3 -- %d\n", a);
-			// printf("--%d \n", a);
+		if (invert_flg)
+		{
 			*c = _index(*c) - _index(ring[a]);
-		}else {
-			printf("0 -- %d\n", a);
-			// printf(" %d \n", a);
-			*c = _index(*c)  + _index(ring[a]);
 		}
-			
+		else
+		{
+
+			*c = _index(*c) + _index(ring[a]);
+		}
+
 		break;
-	
+
 	default:
 		break;
 	}
 
 	*c = *c % 26;
 
-	if(*c < 0) 
+	if (*c < 0)
 		*c += 26;
 
-	// printf("hi %c \n", *c + 65);
-	*c += 65;
+	// printf(" %d -- ",  _indices->r_index);
 
+	if (_indices->is_inverted)
+	{
+
+		printf("is this what %d %s %c\n", *c, rotors[3 - _indices->r_index].alpha, *c + 65);
+		char *e;
+		e = strchr(rotors[3 - _indices->r_index].alpha, *c + 65);
+
+		*c = (int)(e - rotors[3 - _indices->r_index].alpha);
+		*c += 65;
+		// printf("%c index \n", *c );
+	}
+	else
+	{
+		*c = rotors[3 - _indices->r_index].alpha[*c];
+	}
+
+	printf("--->  %c <----\n", *c);
 
 	return 1;
 }
 
-static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext) {
-	
+static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext)
+{
+
 	int n_rotors;
 	// int path;
 	// int mid_path;
 	int route;
-	int * ring;
-	char * plug_al;
-	char * pch;
-	char * plaintext_cpy;
-	
-	rotor * rs;
-	plugboard * p;
+	int *ring;
+	char *plug_al;
+	char *pch;
+	char *plaintext_cpy;
+
+	rotor *rs;
+	plugboard *p;
 	indices i;
 
 	i.is_contact = 0;
@@ -477,39 +508,45 @@ static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *pl
 	ring = _wheels->ring;
 	plug_al = _plugboard->alpha;
 
-	int index = 0; 
+	int index = 0;
 
 	int max_str = strlen(plaintext_cpy);
 
-	while( index < max_str){
+	// printf("--- here \n");
+
+	while (index < max_str)
+	{
 		plaintext_cpy[index] = plug_al[(plaintext_cpy[index] % 65)];
 		int c = plaintext_cpy[index];
-		
-		
+
+		_step(_wheels);
+
 		i.index = 0;
-		while(i.index < 7){
-			_step(_wheels);	
-			_scramble(&c, &i, ring);
+		while (i.index < 7)
+		{
+			// printf(" encode--> %c\n", c);
+			_scramble(&c, &i, ring, rs);
 			_walk(&i, n_rotors, i.index);
 
 			i.index++;
 		}
-		printf("\n\n");
-		_scramble(&c, &i, ring);
-		// printf("--- pov %c\n\n", c);
-		plaintext_cpy[index] = plug_al[(c % 65)];;
 
-		printf("---> %c\n\n", plaintext_cpy[index] );
+		printf("\n\n");
+		printf(" encode--> %c\n", c);
+		_scramble(&c, &i, ring, rs);
+
+		printf("---> %c\n\n", plaintext_cpy[index]);
 		index++;
 	}
 
 	index = 0;
-	while(index < 3){
+	while (index < 3)
+	{
 		printf("%c ", ring[index++]);
 	}
 
+	free(plaintext_cpy);
 	printf("\n");
-	
 
 	return 1;
 }
