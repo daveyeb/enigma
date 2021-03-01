@@ -41,6 +41,8 @@ typedef struct indices
 	int r_index;
 	int is_inverted;
 	int is_contact;
+	int rotate_inner;
+	int rotate_outer;
 } indices;
 
 static inline int config_wheel_order(wheels *_wheels, const char *w_order);
@@ -121,7 +123,6 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 
 		if (model_or_wire == 0)
 		{
-
 			for (index = 0; index < _wheels->n_rotors; index++)
 			{
 				if (strcmp(w_tokens[index], buf) == 0)
@@ -280,7 +281,6 @@ static inline int config_reflector_wiring(wheels *_wheels, const char *reflector
 	int n_rotors;
 	int index;
 	int r_index;
-	int f_index;
 
 	n_rotors = _wheels->n_rotors;
 
@@ -339,7 +339,6 @@ static inline int _step(wheels *_wheels)
 {
 	rotor *rs;
 	int n_rotors;
-	int index;
 	int *ring;
 
 	if (!_wheels->is_config)
@@ -393,6 +392,9 @@ static inline int _walk(indices *_indices, int n_rotors, int index)
 	else
 		_indices->r_index++;
 
+	_indices->rotate_inner = !_indices->is_inverted ? _indices->r_index % 2 == 0 : _indices->r_index % 2 == 1;
+	_indices->rotate_outer = !(_indices->is_inverted && _indices->is_contact) && (_indices->index % 2 == 1);
+
 	return 1;
 }
 
@@ -404,43 +406,35 @@ static inline int _index(int c)
 static inline int _scramble(int *c, indices *_indices, int *ring, rotor *rotors)
 {
 
-	int invert_flg = !(_indices->is_inverted && _indices->is_contact);
-	invert_flg = invert_flg && (_indices->index % 2 == 1);
-	int a;
+	int swap_idxx;
 
 	if (_indices->r_index < 0)
 	{
-		*c = _index(*c);
+		*c = _index(*c) - _index(ring[2]);
 		return 1;
 	}
 
 	switch (_indices->is_contact)
 	{
 	case 1:
-		a = !_indices->is_inverted ? _indices->r_index % 2 == 0 : _indices->r_index % 2 == 1;
-		if (a)
+
+		if (_indices->rotate_inner)
 		{
-			printf("%d index %d +  %d - %d = %d \n", *c, _index(*c), _index(ring[1]), _index(ring[2]), _index(*c) + (_index(ring[1]) - _index(ring[2])));
-			*c = _index(*c) + (_index(ring[0]) - _index(ring[1]));
+			swap_idxx = _indices->is_inverted ? 1 : 2;
+			*c = _index(*c) + (_index(ring[swap_idxx & 1]) - _index(ring[(swap_idxx - 1) & 1]));
 		}
 		else
 		{
-			printf("%d index %d +  %d - %d = %d \n", *c, _index(*c), _index(ring[1]), _index(ring[2]), _index(*c) + (_index(ring[1]) - _index(ring[2])));
-			*c = _index(*c) + (_index(ring[1]) - _index(ring[2]));
-			printf("%c index \n", *c + 65);
+			swap_idxx = _indices->is_inverted ? 2 : 1;
+			*c = _index(*c) + (_index(ring[swap_idxx]) - _index(ring[(swap_idxx | 2) - 1]));
 		}
 		break;
 	case 0:
-		a = (_indices->r_index <= 0) ? 2 : 0;
-		if (invert_flg)
-		{
-			*c = _index(*c) - _index(ring[a]);
-		}
+		swap_idxx = (_indices->r_index <= 0) ? 2 : 0;
+		if (_indices->rotate_outer)
+			*c = _index(*c) - _index(ring[swap_idxx]);
 		else
-		{
-
-			*c = _index(*c) + _index(ring[a]);
-		}
+			*c = _index(*c) + _index(ring[swap_idxx]);
 
 		break;
 
@@ -453,25 +447,19 @@ static inline int _scramble(int *c, indices *_indices, int *ring, rotor *rotors)
 	if (*c < 0)
 		*c += 26;
 
-	// printf(" %d -- ",  _indices->r_index);
-
 	if (_indices->is_inverted)
 	{
 
-		printf("is this what %d %s %c\n", *c, rotors[3 - _indices->r_index].alpha, *c + 65);
 		char *e;
 		e = strchr(rotors[3 - _indices->r_index].alpha, *c + 65);
 
 		*c = (int)(e - rotors[3 - _indices->r_index].alpha);
 		*c += 65;
-		// printf("%c index \n", *c );
 	}
 	else
 	{
 		*c = rotors[3 - _indices->r_index].alpha[*c];
 	}
-
-	printf("--->  %c <----\n", *c);
 
 	return 1;
 }
@@ -480,8 +468,6 @@ static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *pl
 {
 
 	int n_rotors;
-	// int path;
-	// int mid_path;
 	int route;
 	int *ring;
 	char *plug_al;
@@ -496,6 +482,8 @@ static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *pl
 	i.is_inverted = 0;
 	i.r_index = 0;
 	i.index = 0;
+	i.rotate_inner = 0;
+	i.rotate_outer = 0;
 
 	rs = _wheels->_rotors;
 	p = _plugboard;
@@ -512,41 +500,39 @@ static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *pl
 
 	int max_str = strlen(plaintext_cpy);
 
-	// printf("--- here \n");
-
 	while (index < max_str)
 	{
+		printf("here");
 		plaintext_cpy[index] = plug_al[(plaintext_cpy[index] % 65)];
 		int c = plaintext_cpy[index];
 
 		_step(_wheels);
 
 		i.index = 0;
-		while (i.index < 7)
+		while (i.index <= 6)
 		{
-			// printf(" encode--> %c\n", c);
 			_scramble(&c, &i, ring, rs);
 			_walk(&i, n_rotors, i.index);
 
 			i.index++;
 		}
 
-		printf("\n\n");
-		printf(" encode--> %c\n", c);
 		_scramble(&c, &i, ring, rs);
+		printf("--> %c <--", c + 65);
 
-		printf("---> %c\n\n", plaintext_cpy[index]);
+
 		index++;
 	}
 
-	index = 0;
-	while (index < 3)
-	{
-		printf("%c ", ring[index++]);
-	}
+	// index = 0;
+	// while (index < 3)
+	// {
+	// 	printf("%c ", ring[index++]);
+	// }
+	
+
 
 	free(plaintext_cpy);
-	printf("\n");
 
 	return 1;
 }
