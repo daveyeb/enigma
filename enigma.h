@@ -9,31 +9,39 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#define rotor_no(s) #s
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define _ENIGMA_FUNC static inline
+#define _ENIGMA_MALLOC(_size) malloc(_size)
+#define _ENIGMA_FREE(_ptr) free(_ptr)
+#define ENGIMA_STRING(s) s
+
+#define _enigma_char_t char
+#define _enigma_strlen strlen
+#define _enigma_strcpy strcpy
+#define _enigma_strcmp strcmp
+#define _enigma_strchr strchr
 
 typedef struct rotor
 {
 	int is_reflector;
-	char *alpha;
-	char *model_name;
-	char *notch;
-} rotor;
+	_enigma_char_t *alpha;
+	_enigma_char_t *model_name;
+	_enigma_char_t *notch;
+} _enigma_rotor;
 
 typedef struct wheels
 {
-	rotor *_rotors;
+	_enigma_rotor *_rotors;
 	size_t n_rotors;
 	int is_config;
 	int *ring;
 	int is_step;
-} wheels;
+} _enigma_wheels;
 
 typedef struct plugboard
 {
-	char *alpha;
+	_enigma_char_t *alpha;
 	int stecker_count;
-} plugboard;
+} _enigma_plugboard;
 
 typedef struct indices
 {
@@ -43,21 +51,34 @@ typedef struct indices
 	int is_contact;
 	int rotate_inner;
 	int rotate_outer;
-} indices;
+} _engima_indices;
 
-static inline int config_wheel_order(wheels *_wheels, const char *w_order);
-static inline int config_ring_settings(wheels *_wheels, const char *r_settings);
-static inline int config_reflector_wiring(wheels *_wheels, const char *reflector, const char *r_wiring);
-static inline int config_start_pos_rotors(wheels *_wheels, const char *indicator);
-static inline int config_plug_connections(plugboard *_plugboard, const char *p_connections);
-static inline int _step(wheels *_wheels);
-static inline int _increment_ring(int *c);
-static inline int _index(int c);
-static inline int _walk(indices *_indices, int n_rotors, int index);
-static inline int _scramble(int *c, indices *_indices, int *ring, rotor *rotors);
-static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext);
+_ENIGMA_FUNC
+int _step(_enigma_wheels *_wheels);
+_ENIGMA_FUNC
+int _increment_ring(int *c);
+_ENIGMA_FUNC
+int _index(int c);
+_ENIGMA_FUNC
+int _walk(_engima_indices *_indices, int n_rotors, int index);
+_ENIGMA_FUNC
+int _scramble(int *c, _engima_indices *_indices, int *ring, _enigma_rotor *rotors);
 
-static inline int _increment_ring(int *c)
+_ENIGMA_FUNC
+int config_wheel_order(_enigma_wheels *_wheels, const _enigma_char_t *w_order);
+_ENIGMA_FUNC
+int config_ring_settings(_enigma_wheels *_wheels, const _enigma_char_t *r_settings);
+_ENIGMA_FUNC
+int config_reflector_wiring(_enigma_wheels *_wheels, const _enigma_char_t *reflector, const _enigma_char_t *r_wiring);
+_ENIGMA_FUNC
+int config_start_pos_rotors(_enigma_wheels *_wheels, const _enigma_char_t *indicator);
+_ENIGMA_FUNC
+int config_plug_connections(_enigma_plugboard *_plugboard, const _enigma_char_t *p_connections);
+_ENIGMA_FUNC
+int encrypt(_enigma_wheels *_wheels, _enigma_plugboard *_plugboard, const _enigma_char_t *plaintext);
+
+_ENIGMA_FUNC
+int _increment_ring(int *c)
 {
 	if (*c < 65 || *c > 90)
 		return 0;
@@ -67,23 +88,24 @@ static inline int _increment_ring(int *c)
 	return 1;
 }
 
-static inline int config_wheel_order(wheels *_wheels, const char *w_order)
+_ENIGMA_FUNC
+int config_wheel_order(_enigma_wheels *_wheels, const _enigma_char_t *w_order)
 {
 	int index = 0;
 	int model_or_wire = 0;
 	int reflector_cnt = 0;
 
-	char buf[4096];
-	char *w_tokens[256];
-	char *pch;
-	char *w_order_cpy;
+	_enigma_char_t buf[4096];
+	_enigma_char_t *w_tokens[256];
+	_enigma_char_t *pch;
+	_enigma_char_t *w_order_cpy;
 
 	for (index = 0; index < 256; index++)
 		w_tokens[index] = NULL;
 
-	w_order_cpy = malloc(strlen(w_order) + 1);
-	strcpy(w_order_cpy, w_order);
-	w_order_cpy[strlen(w_order)] = '\0';
+	w_order_cpy = _ENIGMA_MALLOC(_enigma_strlen(w_order) + 1);
+	_enigma_strcpy(w_order_cpy, w_order);
+	w_order_cpy[_enigma_strlen(w_order)] = '\0';
 
 	index = 0;
 	pch = strtok(w_order_cpy, " ");
@@ -100,7 +122,7 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 	if (index < 4)
 		return 0;
 
-	_wheels->_rotors = malloc(--index * sizeof(rotor));
+	_wheels->_rotors = _ENIGMA_MALLOC(--index * sizeof(_enigma_rotor));
 	_wheels->is_config = 0;
 	_wheels->n_rotors = index;
 
@@ -112,10 +134,10 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 	while (fgets(buf, 4096, f) != NULL)
 	{
 
-		if (strlen(buf) > 0 && buf[strlen(buf) - 1] == '\n')
-			buf[strlen(buf) - 1] = '\0';
+		if (_enigma_strlen(buf) > 0 && buf[_enigma_strlen(buf) - 1] == '\n')
+			buf[_enigma_strlen(buf) - 1] = '\0';
 
-		if (strlen(buf) == 0)
+		if (_enigma_strlen(buf) == 0)
 		{
 			model_or_wire = 0;
 			continue;
@@ -125,7 +147,7 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 		{
 			for (index = 0; index < _wheels->n_rotors; index++)
 			{
-				if (strcmp(w_tokens[index], buf) == 0)
+				if (_enigma_strcmp(w_tokens[index], buf) == 0)
 				{
 					model_or_wire = 1;
 					break;
@@ -135,15 +157,15 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 		else
 		{
 
-			char *ttok = w_tokens[index];
+			_enigma_char_t *ttok = w_tokens[index];
 
 			for (; index < _wheels->n_rotors; index++)
 			{
-				if (strcmp(w_tokens[index], ttok) != 0)
+				if (_enigma_strcmp(w_tokens[index], ttok) != 0)
 					continue;
-				rotor r;
+				_enigma_rotor r;
 
-				pch = strchr(buf + 1, '/');
+				pch = _enigma_strchr(buf + 1, '/');
 
 				if (pch == NULL)
 				{
@@ -154,13 +176,13 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 
 					r.is_reflector = 1;
 
-					r.alpha = malloc(strlen(buf + 1) + 1);
-					strcpy(r.alpha, buf + 1);
-					r.alpha[strlen(buf + 1)] = '\0';
+					r.alpha = _ENIGMA_MALLOC(_enigma_strlen(buf + 1) + 1);
+					_enigma_strcpy(r.alpha, buf + 1);
+					r.alpha[_enigma_strlen(buf + 1)] = '\0';
 
-					r.model_name = malloc(strlen(w_tokens[index]) + 1);
-					strcpy(r.model_name, w_tokens[index]);
-					r.model_name[strlen(w_tokens[index])] = '\0';
+					r.model_name = _ENIGMA_MALLOC(_enigma_strlen(w_tokens[index]) + 1);
+					_enigma_strcpy(r.model_name, w_tokens[index]);
+					r.model_name[_enigma_strlen(w_tokens[index])] = '\0';
 
 					r.notch = NULL;
 				}
@@ -169,16 +191,16 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 
 					r.is_reflector = 0;
 
-					r.alpha = malloc(26);
+					r.alpha = _ENIGMA_MALLOC(26);
 					strncpy(r.alpha, buf + 1, 26);
 					r.alpha[26] = '\0';
 
-					r.model_name = malloc(strlen(w_tokens[index]) + 1);
-					strcpy(r.model_name, w_tokens[index]);
-					r.model_name[strlen(w_tokens[index])] = '\0';
+					r.model_name = _ENIGMA_MALLOC(_enigma_strlen(w_tokens[index]) + 1);
+					_enigma_strcpy(r.model_name, w_tokens[index]);
+					r.model_name[_enigma_strlen(w_tokens[index])] = '\0';
 
-					r.notch = malloc(3);
-					strcpy(r.notch, buf + 28);
+					r.notch = _ENIGMA_MALLOC(3);
+					_enigma_strcpy(r.notch, buf + 28);
 					r.notch[30] = '\0';
 				}
 
@@ -195,54 +217,56 @@ static inline int config_wheel_order(wheels *_wheels, const char *w_order)
 	_wheels->is_config = 1;
 	_wheels->is_step = 0;
 
-	free(w_order_cpy);
+	_ENIGMA_FREE(w_order_cpy);
 
 	return 1;
 }
 
-static inline int config_start_pos_rotors(wheels *_wheels, const char *indicator)
+_ENIGMA_FUNC
+int config_start_pos_rotors(_enigma_wheels *_wheels, const _enigma_char_t *indicator)
 {
 
-	char *pch;
-	char *indicator_cpy;
+	_enigma_char_t *pch;
+	_enigma_char_t *indicator_cpy;
 	int index;
 	int max_rings;
 
 	max_rings = _wheels->n_rotors > 5 ? 3 : 4;
-	_wheels->ring = malloc(sizeof(int) * max_rings);
+	_wheels->ring = _ENIGMA_MALLOC(sizeof(int) * max_rings);
 
-	indicator_cpy = malloc(strlen(indicator) + 1);
-	strcpy(indicator_cpy, indicator);
-	indicator_cpy[strlen(indicator)] = '\0';
+	indicator_cpy = _ENIGMA_MALLOC(_enigma_strlen(indicator) + 1);
+	_enigma_strcpy(indicator_cpy, indicator);
+	indicator_cpy[_enigma_strlen(indicator)] = '\0';
 
 	pch = strtok(indicator_cpy, " ");
 
 	index = 0;
 	while (pch != NULL)
 	{
-		if (strlen(pch) > 1 || index == max_rings)
+		if (_enigma_strlen(pch) > 1 || index == max_rings)
 			return 0;
 
 		_wheels->ring[index++] = pch[0];
 		pch = strtok(NULL, " ");
 	}
 
-	free(indicator_cpy);
+	_ENIGMA_FREE(indicator_cpy);
 
 	return 1;
 }
 
-static inline int config_plug_connections(plugboard *_plugboard, const char *p_connections)
+_ENIGMA_FUNC
+int config_plug_connections(_enigma_plugboard *_plugboard, const _enigma_char_t *p_connections)
 {
-	char *p_connections_cpy;
-	char *pch;
+	_enigma_char_t *p_connections_cpy;
+	_enigma_char_t *pch;
 	int index;
 
-	p_connections_cpy = malloc(strlen(p_connections) + 1);
-	strcpy(p_connections_cpy, p_connections);
-	p_connections_cpy[strlen(p_connections)] = '\0';
+	p_connections_cpy = _ENIGMA_MALLOC(_enigma_strlen(p_connections) + 1);
+	_enigma_strcpy(p_connections_cpy, p_connections);
+	p_connections_cpy[_enigma_strlen(p_connections)] = '\0';
 
-	_plugboard->alpha = malloc(27);
+	_plugboard->alpha = _ENIGMA_MALLOC(27);
 	_plugboard->stecker_count = 0;
 
 	index = 64;
@@ -257,7 +281,7 @@ static inline int config_plug_connections(plugboard *_plugboard, const char *p_c
 	index = 0;
 	while (pch != NULL)
 	{
-		if (strlen(pch) > 2 || _plugboard->stecker_count++ > 13)
+		if (_enigma_strlen(pch) > 2 || _plugboard->stecker_count++ > 13)
 			return 0;
 
 		_plugboard->alpha[(pch[0] % 65)] = pch[1];
@@ -266,17 +290,18 @@ static inline int config_plug_connections(plugboard *_plugboard, const char *p_c
 		pch = strtok(NULL, " ");
 	}
 
-	free(p_connections_cpy);
+	_ENIGMA_FREE(p_connections_cpy);
 
 	return 1;
 }
 
-static inline int config_reflector_wiring(wheels *_wheels, const char *reflector, const char *r_wiring)
+_ENIGMA_FUNC
+int config_reflector_wiring(_enigma_wheels *_wheels, const _enigma_char_t *reflector, const _enigma_char_t *r_wiring)
 {
-	char *pch;
-	char *pch2[2];
-	char *r_wiring_cpy;
-	char *rfl_alpha_cpy;
+	_enigma_char_t *pch;
+	_enigma_char_t *pch2[2];
+	_enigma_char_t *r_wiring_cpy;
+	_enigma_char_t *rfl_alpha_cpy;
 
 	int n_rotors;
 	int index;
@@ -286,32 +311,32 @@ static inline int config_reflector_wiring(wheels *_wheels, const char *reflector
 
 	for (index = 0; index < n_rotors; index++)
 	{
-		if (_wheels->_rotors[index].is_reflector && strcmp(_wheels->_rotors[index].model_name, reflector) == 0)
+		if (_wheels->_rotors[index].is_reflector && _enigma_strcmp(_wheels->_rotors[index].model_name, reflector) == 0)
 			break;
 	}
 
 	if (index == n_rotors)
 		return 0;
 
-	r_wiring_cpy = malloc(strlen(r_wiring) + 1);
-	strcpy(r_wiring_cpy, r_wiring);
-	r_wiring_cpy[strlen(r_wiring)] = '\0';
+	r_wiring_cpy = _ENIGMA_MALLOC(_enigma_strlen(r_wiring) + 1);
+	_enigma_strcpy(r_wiring_cpy, r_wiring);
+	r_wiring_cpy[_enigma_strlen(r_wiring)] = '\0';
 
 	r_index = index;
 	pch = strtok(r_wiring_cpy, " ");
 
-	rfl_alpha_cpy = malloc(strlen(_wheels->_rotors[r_index].alpha) + 1);
-	strcpy(rfl_alpha_cpy, _wheels->_rotors[r_index].alpha);
-	rfl_alpha_cpy[strlen(r_wiring)] = '\0';
+	rfl_alpha_cpy = _ENIGMA_MALLOC(_enigma_strlen(_wheels->_rotors[r_index].alpha) + 1);
+	_enigma_strcpy(rfl_alpha_cpy, _wheels->_rotors[r_index].alpha);
+	rfl_alpha_cpy[_enigma_strlen(r_wiring)] = '\0';
 
 	index = 0;
 	while (pch != NULL)
 	{
-		if (strlen(pch) > 2 || index > 13)
+		if (_enigma_strlen(pch) > 2 || index > 13)
 			return 0;
 
-		pch2[0] = strchr(rfl_alpha_cpy, pch[0]);
-		pch2[1] = strchr(rfl_alpha_cpy, pch[1]);
+		pch2[0] = _enigma_strchr(rfl_alpha_cpy, pch[0]);
+		pch2[1] = _enigma_strchr(rfl_alpha_cpy, pch[1]);
 
 		rfl_alpha_cpy[(pch2[0] - rfl_alpha_cpy)] = pch[1];
 		rfl_alpha_cpy[(pch2[1] - rfl_alpha_cpy)] = pch[0];
@@ -320,24 +345,23 @@ static inline int config_reflector_wiring(wheels *_wheels, const char *reflector
 		pch = strtok(NULL, " ");
 	}
 
-	strcpy(_wheels->_rotors[r_index].alpha, rfl_alpha_cpy);
-	/// check here
+	_enigma_strcpy(_wheels->_rotors[r_index].alpha, rfl_alpha_cpy);
 
-	free(rfl_alpha_cpy);
+	_ENIGMA_FREE(rfl_alpha_cpy);
 
 	return 1;
 }
 
-static inline int config_ring_settings(wheels *_wheels, const char *r_settings)
+_ENIGMA_FUNC
+int config_ring_settings(_enigma_wheels *_wheels, const _enigma_char_t *r_settings)
 {
 	return 1;
 }
 
-//arrange rotors
-
-static inline int _step(wheels *_wheels)
+_ENIGMA_FUNC
+int _step(_enigma_wheels *_wheels)
 {
-	rotor *rs;
+	_enigma_rotor *rs;
 	int n_rotors;
 	int *ring;
 
@@ -348,12 +372,12 @@ static inline int _step(wheels *_wheels)
 	n_rotors = _wheels->n_rotors;
 	ring = _wheels->ring;
 
-	if (strchr(rs[2].notch, (char)ring[1]) == NULL)
+	if (_enigma_strchr(rs[2].notch, (_enigma_char_t)ring[1]) == NULL)
 	{
 		_wheels->is_step = 0;
 	}
 
-	if (strchr(rs[2].notch, (char)ring[1]) && !_wheels->is_step)
+	if (_enigma_strchr(rs[2].notch, (_enigma_char_t)ring[1]) && !_wheels->is_step)
 	{
 		_increment_ring(&ring[2]);
 		_increment_ring(&ring[1]);
@@ -363,7 +387,7 @@ static inline int _step(wheels *_wheels)
 		return 1;
 	}
 
-	if (strchr(rs[3].notch, (char)ring[2]))
+	if (_enigma_strchr(rs[3].notch, (_enigma_char_t)ring[2]))
 	{
 		_increment_ring(&ring[2]);
 		_increment_ring(&ring[1]);
@@ -375,7 +399,8 @@ static inline int _step(wheels *_wheels)
 	return 1;
 }
 
-static inline int _walk(indices *_indices, int n_rotors, int index)
+_ENIGMA_FUNC
+int _walk(_engima_indices *_indices, int n_rotors, int index)
 {
 
 	if (_indices->r_index < 0 || _indices->r_index > n_rotors)
@@ -385,7 +410,10 @@ static inline int _walk(indices *_indices, int n_rotors, int index)
 		_indices->is_inverted = 1;
 
 	if (index % 2 == 0)
-		_indices->is_contact = ++_indices->is_contact % 2;
+	{
+		++_indices->is_contact;
+		_indices->is_contact %= 2;
+	}
 
 	if (_indices->is_inverted)
 		_indices->r_index--;
@@ -398,12 +426,14 @@ static inline int _walk(indices *_indices, int n_rotors, int index)
 	return 1;
 }
 
-static inline int _index(int c)
+_ENIGMA_FUNC
+int _index(int c)
 {
 	return c - 65;
 }
 
-static inline int _scramble(int *c, indices *_indices, int *ring, rotor *rotors)
+_ENIGMA_FUNC
+int _scramble(int *c, _engima_indices *_indices, int *ring, _enigma_rotor *rotors)
 {
 
 	int swap_idxx;
@@ -450,8 +480,8 @@ static inline int _scramble(int *c, indices *_indices, int *ring, rotor *rotors)
 	if (_indices->is_inverted)
 	{
 
-		char *e;
-		e = strchr(rotors[3 - _indices->r_index].alpha, *c + 65);
+		_enigma_char_t *e;
+		e = _enigma_strchr(rotors[3 - _indices->r_index].alpha, *c + 65);
 
 		*c = (int)(e - rotors[3 - _indices->r_index].alpha);
 		*c += 65;
@@ -464,19 +494,20 @@ static inline int _scramble(int *c, indices *_indices, int *ring, rotor *rotors)
 	return 1;
 }
 
-static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *plaintext)
+_ENIGMA_FUNC
+int encrypt(_enigma_wheels *_wheels, _enigma_plugboard *_plugboard, const _enigma_char_t *plaintext)
 {
 
 	int n_rotors;
 	int route;
 	int *ring;
-	char *plug_al;
-	char *pch;
-	char *plaintext_cpy;
+	_enigma_char_t *plug_al;
+	_enigma_char_t *pch;
+	_enigma_char_t *plaintext_cpy;
 
-	rotor *rs;
-	plugboard *p;
-	indices i;
+	_enigma_rotor *rs;
+	_enigma_plugboard *p;
+	_engima_indices i;
 
 	i.is_contact = 0;
 	i.is_inverted = 0;
@@ -489,20 +520,19 @@ static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *pl
 	p = _plugboard;
 	n_rotors = _wheels->n_rotors;
 
-	plaintext_cpy = malloc(strlen(plaintext) + 1);
-	strcpy(plaintext_cpy, plaintext);
-	plaintext_cpy[strlen(plaintext_cpy)] = '\0';
+	plaintext_cpy = _ENIGMA_MALLOC(_enigma_strlen(plaintext) + 1);
+	_enigma_strcpy(plaintext_cpy, plaintext);
+	plaintext_cpy[_enigma_strlen(plaintext_cpy)] = '\0';
 
 	ring = _wheels->ring;
 	plug_al = _plugboard->alpha;
 
 	int index = 0;
 
-	int max_str = strlen(plaintext_cpy);
+	int max_str = _enigma_strlen(plaintext_cpy);
 
 	while (index < max_str)
 	{
-		printf("here");
 		plaintext_cpy[index] = plug_al[(plaintext_cpy[index] % 65)];
 		int c = plaintext_cpy[index];
 
@@ -520,6 +550,12 @@ static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *pl
 		_scramble(&c, &i, ring, rs);
 		printf("--> %c <--", c + 65);
 
+		i.is_contact = 0;
+		i.is_inverted = 0;
+		i.r_index = 0;
+		i.index = 0;
+		i.rotate_inner = 0;
+		i.rotate_outer = 0;
 
 		index++;
 	}
@@ -529,10 +565,8 @@ static inline int encrypt(wheels *_wheels, plugboard *_plugboard, const char *pl
 	// {
 	// 	printf("%c ", ring[index++]);
 	// }
-	
 
-
-	free(plaintext_cpy);
+	_ENIGMA_FREE(plaintext_cpy);
 
 	return 1;
 }
