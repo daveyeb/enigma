@@ -19,6 +19,7 @@
 #define _enigma_strcpy strcpy
 #define _enigma_strcmp strcmp
 #define _enigma_strchr strchr
+#define _enigma_strtok strtok
 
 typedef struct rotor
 {
@@ -108,14 +109,14 @@ int config_wheel_order(_enigma_wheels *_wheels, const _enigma_char_t *w_order)
 	w_order_cpy[_enigma_strlen(w_order)] = '\0';
 
 	index = 0;
-	pch = strtok(w_order_cpy, " ");
+	pch = _enigma_strtok(w_order_cpy, " ");
 	w_tokens[index++] = pch;
 	while (pch != NULL)
 	{
 		if (index > 6)
 			return 0;
 
-		pch = strtok(NULL, " ");
+		pch = _enigma_strtok(NULL, " ");
 		w_tokens[index++] = pch;
 	}
 
@@ -238,7 +239,7 @@ int config_start_pos_rotors(_enigma_wheels *_wheels, const _enigma_char_t *indic
 	_enigma_strcpy(indicator_cpy, indicator);
 	indicator_cpy[_enigma_strlen(indicator)] = '\0';
 
-	pch = strtok(indicator_cpy, " ");
+	pch = _enigma_strtok(indicator_cpy, " ");
 
 	index = 0;
 	while (pch != NULL)
@@ -247,7 +248,7 @@ int config_start_pos_rotors(_enigma_wheels *_wheels, const _enigma_char_t *indic
 			return 0;
 
 		_wheels->ring[index++] = pch[0];
-		pch = strtok(NULL, " ");
+		pch = _enigma_strtok(NULL, " ");
 	}
 
 	_ENIGMA_FREE(indicator_cpy);
@@ -276,7 +277,7 @@ int config_plug_connections(_enigma_plugboard *_plugboard, const _enigma_char_t 
 	}
 	_plugboard->alpha[26] = '\0';
 
-	pch = strtok(p_connections_cpy, " ");
+	pch = _enigma_strtok(p_connections_cpy, " ");
 
 	index = 0;
 	while (pch != NULL)
@@ -287,7 +288,7 @@ int config_plug_connections(_enigma_plugboard *_plugboard, const _enigma_char_t 
 		_plugboard->alpha[(pch[0] % 65)] = pch[1];
 		_plugboard->alpha[(pch[1] % 65)] = pch[0];
 
-		pch = strtok(NULL, " ");
+		pch = _enigma_strtok(NULL, " ");
 	}
 
 	_ENIGMA_FREE(p_connections_cpy);
@@ -323,7 +324,7 @@ int config_reflector_wiring(_enigma_wheels *_wheels, const _enigma_char_t *refle
 	r_wiring_cpy[_enigma_strlen(r_wiring)] = '\0';
 
 	r_index = index;
-	pch = strtok(r_wiring_cpy, " ");
+	pch = _enigma_strtok(r_wiring_cpy, " ");
 
 	rfl_alpha_cpy = _ENIGMA_MALLOC(_enigma_strlen(_wheels->_rotors[r_index].alpha) + 1);
 	_enigma_strcpy(rfl_alpha_cpy, _wheels->_rotors[r_index].alpha);
@@ -342,7 +343,7 @@ int config_reflector_wiring(_enigma_wheels *_wheels, const _enigma_char_t *refle
 		rfl_alpha_cpy[(pch2[1] - rfl_alpha_cpy)] = pch[0];
 
 		index++;
-		pch = strtok(NULL, " ");
+		pch = _enigma_strtok(NULL, " ");
 	}
 
 	_enigma_strcpy(_wheels->_rotors[r_index].alpha, rfl_alpha_cpy);
